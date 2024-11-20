@@ -34,6 +34,7 @@ Route::group(['middleware' => ['jwt.auth', 'role:reader']], function () {
    Route::post('/articles/{article}/like', [ArticleController::class, 'like']);
    Route::delete('/articles/{article}/unlike', [ArticleController::class, 'unlike']);
    Route::post('/articles/{article}/comment', [ArticleController::class, 'comment']);
+   Route::post('/articles/{article}/read', [ArticleController::class, 'trackRead']);
 });
 
 

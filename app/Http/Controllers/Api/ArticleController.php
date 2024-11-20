@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Article;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
@@ -172,32 +173,40 @@ class ArticleController extends Controller
         return response()->json(['comments' => $comments], 200);
     }
 
-    public function trackRead(Request $request, Article $article)
-    {
-        $user = $request->user();
+   // Laravel Controller
+public function trackRead(Request $request, $articleId)
+{
+    $user = $request->user();
 
-        // Memastikan hanya role reader yang dapat membaca
-        if ($user->role !== 'reader') {
-            return response()->json([
-                'status' => false,
-                'message' => 'Only readers can read articles.'
-            ], 403);
-        }
+    // Pastikan hanya pembaca dengan role 'reader'
+    if ($user->role !== 'reader') {
+        return response()->json(['status' => false, 'message' => 'Unauthorized'], 403);
+    }
 
-        $article = Article::findOrFail($article->id);
+    $article = Article::findOrFail($articleId);
 
-    // Tambahkan pembacaan ke tabel artikel
-    $article->increment('views_count');
+    // Cegah pembacaan duplikat (jika diperlukan)
+    $alreadyRead = DB::table('article_reads')
+        ->where('article_id', $articleId)
+        ->where('user_id', $user->id)
+        ->exists();
 
-    // Tambahkan kredit ke penulis (writer)
-    $writer = $article->writer; // Asumsi ada relasi dengan writer
-    $writer->increment('balance', 10); // Tambah kredit 10 (atau sesuai aturan Anda)
+    if ($alreadyRead) {
+        return response()->json(['status' => false, 'message' => 'Article already read.'], 400);
+    }
 
-    return response()->json([
-        'status' => true,
-        'message' => 'Article read tracked successfully.',
-        'balance' => $writer->balance,
+    DB::table('article_reads')->insert([
+        'article_id' => $articleId,
+        'user_id' => $user->id,
+        'created_at' => now(),
+        'updated_at' => now(),
     ]);
 
-    }
+    // Tambahkan balance ke penulis artikel
+    $writer = $article->writer; // Asumsi relasi sudah ada
+    $writer->increment('balance', 10); // Tambah 10 kredit atau sesuai aturan
+
+    return response()->json(['status' => true, 'message' => 'Read tracked successfully.']);
+}
+
 }
